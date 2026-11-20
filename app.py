@@ -3,6 +3,7 @@ import pymongo
 from google import genai
 from google.genai import types
 import numpy as np
+import time
 
 # =======================
 # CONFIGURACIÓN
