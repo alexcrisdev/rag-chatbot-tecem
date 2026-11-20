@@ -78,6 +78,8 @@ def buscar_similares(embedding, k=5):
     ]
     return list(collection.aggregate(pipeline))
 
+MODELOS = ["gemini-3.8-flash", "gemini-3.5-flash"]  # principal y respaldo
+
 def generar_respuesta(pregunta: str, contextos: list[dict]) -> str:
     """Usa Gemini para responder con contexto recuperado (RAG)."""
     contexto = "\n\n".join([c["texto"] for c in contextos])
@@ -90,11 +92,22 @@ Pregunta: {pregunta}
 
 Responde de forma concisa y clara en español."""
 
-    response = client_genai.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=prompt,
-    )
-    return response.text
+    ultimo_error = None
+    for modelo in MODELOS:
+        for intento in range(3):  # hasta 3 intentos por modelo
+            try:
+                response = client_genai.models.generate_content(
+                    model=modelo,
+                    contents=prompt,
+                )
+                return response.text + f"\n\n_Modelo: {modelo}_"
+            except Exception as e:
+                ultimo_error = e
+                if getattr(e, "code", None) in (500, 503):  # saturado: esperar y reintentar
+                    time.sleep(2 ** intento)                # 1 s, 2 s, 4 s
+                else:
+                    break                                   # otro error: pasar al respaldo
+    raise ultimo_error
 
 # =======================
 # INTERFAZ STREAMLIT
